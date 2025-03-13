@@ -65,7 +65,7 @@ class KurobbsClient:
         res = self.make_request(self.FIND_ROLE_LIST_API_URL, data)
         
         # 检查 API 响应码是否为成功（假设 code=0 表示成功）
-        if res.code != 0:
+        if res.code != 200:
             raise KurobbsClientException(f"API 请求失败: {res.msg} (code: {res.code})")
         
         # 确保 data 是列表类型且非空
