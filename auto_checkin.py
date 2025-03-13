@@ -59,41 +59,41 @@ class KurobbsClient:
         logger.debug(res.model_dump_json(indent=2, exclude={"data"}))
         return res
 
-def get_user_game_list(self, game_id: int) -> List[Dict[str, Any]]:
-    """Get the list of games for the user."""
-    data = {"gameId": game_id}
-    res = self.make_request(self.FIND_ROLE_LIST_API_URL, data)
+    def get_user_game_list(self, game_id: int) -> List[Dict[str, Any]]:
+        """Get the list of games for the user."""
+        data = {"gameId": game_id}
+        res = self.make_request(self.FIND_ROLE_LIST_API_URL, data)
+        
+        # 检查 API 响应码是否为成功（假设 code=0 表示成功）
+        if res.code != 0:
+            raise KurobbsClientException(f"API 请求失败: {res.msg} (code: {res.code})")
+        
+        # 确保 data 是列表类型且非空
+        if not isinstance(res.data, list) or len(res.data) == 0:
+            raise KurobbsClientException("未找到游戏角色信息，请检查是否绑定角色")
+        
+        return res.data
     
-    # 检查 API 响应码是否为成功（假设 code=0 表示成功）
-    if res.code != 0:
-        raise KurobbsClientException(f"API 请求失败: {res.msg} (code: {res.code})")
+    def checkin(self) -> Response:
+        """Perform the check-in operation."""
+        try:
+            user_game_list = self.get_user_game_list(3)
+            # 确保列表不为空
+            first_role = user_game_list[0]
+        except KurobbsClientException as e:
+            self.exceptions.append(e)
+            return Response(code=-1, msg=str(e))  # 返回错误响应避免后续崩溃
     
-    # 确保 data 是列表类型且非空
-    if not isinstance(res.data, list) or len(res.data) == 0:
-        raise KurobbsClientException("未找到游戏角色信息，请检查是否绑定角色")
-    
-    return res.data
-
-def checkin(self) -> Response:
-    """Perform the check-in operation."""
-    try:
-        user_game_list = self.get_user_game_list(3)
-        # 确保列表不为空
-        first_role = user_game_list[0]
-    except KurobbsClientException as e:
-        self.exceptions.append(e)
-        return Response(code=-1, msg=str(e))  # 返回错误响应避免后续崩溃
-
-    beijing_tz = ZoneInfo('Asia/Shanghai')
-    beijing_time = datetime.now(beijing_tz)
-    data = {
-        "gameId": first_role.get("gameId", 2),
-        "serverId": first_role.get("serverId"),
-        "roleId": first_role.get("roleId"),
-        "userId": first_role.get("userId"),
-        "reqMonth": f"{beijing_time.month:02d}",
-    }
-    return self.make_request(self.SIGN_URL, data)
+        beijing_tz = ZoneInfo('Asia/Shanghai')
+        beijing_time = datetime.now(beijing_tz)
+        data = {
+            "gameId": first_role.get("gameId", 2),
+            "serverId": first_role.get("serverId"),
+            "roleId": first_role.get("roleId"),
+            "userId": first_role.get("userId"),
+            "reqMonth": f"{beijing_time.month:02d}",
+        }
+        return self.make_request(self.SIGN_URL, data)
 
     def sign_in(self) -> Response:
         """Perform the sign-in operation."""
