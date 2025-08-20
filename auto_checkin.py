@@ -24,9 +24,10 @@ class KurobbsClientException(Exception):
 
 
 class KurobbsClient:
-    FIND_ROLE_LIST_API_URL = "https://api.kurobbs.com/user/role/findRoleList"
+    FIND_ROLE_LIST_API_URL = "https://api.kurobbs.com/gamer/role/default"
     SIGN_URL = "https://api.kurobbs.com/encourage/signIn/v2"
     USER_SIGN_URL = "https://api.kurobbs.com/user/signIn"
+    USER_MINE_URL = "https://api.kurobbs.com/user/mineV2"
 
     def __init__(self, token: str):
         self.token = token
@@ -59,24 +60,33 @@ class KurobbsClient:
         logger.debug(res.model_dump_json(indent=2, exclude={"data"}))
         return res
 
-    def get_user_game_list(self, game_id: int) -> List[Dict[str, Any]]:
+    def get_mine_info(self, type: int = 1):
+        """Get mine info"""
+        data = {"type": type}
+        res = self.make_request(self.USER_MINE_URL, data)
+        return res.data
+
+    def get_user_game_list(self, user_id: int) -> List[Dict[str, Any]]:
         """Get the list of games for the user."""
-        data = {"gameId": game_id}
+        data = {"queryUserId": user_id}
         res = self.make_request(self.FIND_ROLE_LIST_API_URL, data)
         return res.data
 
     def checkin(self) -> Response:
         """Perform the check-in operation."""
-        user_game_list = self.get_user_game_list(3)
-
+        mine_info = self.get_mine_info()
+        user_game_list = self.get_user_game_list(user_id=mine_info.get("mine", {}).get("userId", 0))
         # 获取北京时间（UTC+8）
         beijing_tz = ZoneInfo('Asia/Shanghai')
         beijing_time = datetime.now(beijing_tz)
+
+        role_info = user_game_list.get("defaultRoleList", [])[0]
+
         data = {
-            "gameId": user_game_list[0].get("gameId", 2),
-            "serverId": user_game_list[0].get("serverId", None),
-            "roleId": user_game_list[0].get("roleId", 0),
-            "userId": user_game_list[0].get("userId", 0),
+            "gameId": role_info.get("gameId", 2),
+            "serverId": role_info.get("serverId", None),
+            "roleId": role_info.get("roleId", 0),
+            "userId": role_info.get("userId", 0),
             "reqMonth": f"{beijing_time.month:02d}",
         }
         return self.make_request(self.SIGN_URL, data)
@@ -148,7 +158,6 @@ def main():
     """Main function to handle command-line arguments and start the sign-in process."""
     token = os.getenv("TOKEN")
     debug = os.getenv("DEBUG", False)
-    configure_logger(debug=debug)
 
     try:
         kurobbs = KurobbsClient(token)
@@ -160,7 +169,7 @@ def main():
         send_notification(str(e))
         sys.exit(1)
     except Exception as e:
-        logger.error(f"An unexpected error occurred: {e}")
+        logger.exception(f"An unexpected error occurred: {e}")
         sys.exit(1)
 
 
